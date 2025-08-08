@@ -4,6 +4,15 @@ The official Python SDK for MeshAI - AI Agent Interoperability Platform.
 
 MeshAI enables seamless communication and orchestration between AI agents built on different frameworks (LangChain, CrewAI, AutoGen, etc.).
 
+## ✨ Key Features
+
+- **🚀 Framework Agnostic**: Support for LangChain, CrewAI, AutoGen, OpenAI, Anthropic, Google Gemini, Amazon Bedrock
+- **🧠 Advanced Context Management**: Persistent memory, conflict resolution, versioning, and agent-specific isolation
+- **🔄 Seamless Interoperability**: Agents from different frameworks can communicate naturally
+- **📊 Production Ready**: Built-in monitoring, health checks, retry logic, and circuit breakers
+- **🛡️ Secure**: Advanced access control, audit logging, and multi-tenant isolation
+- **⚡ High Performance**: Redis-backed persistence, connection pooling, and optimized routing
+
 ## Quick Start
 
 ### Installation

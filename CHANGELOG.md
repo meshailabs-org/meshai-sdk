@@ -5,6 +5,26 @@ All notable changes to the MeshAI SDK will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2025-01-08
+
+### Added
+- **Advanced Context Management System** - Key differentiator feature
+  - Persistent Redis-backed context storage
+  - Agent-specific memory isolation with access control
+  - Multiple conflict resolution strategies (Last Write Wins, Merge, Agent Priority, Version Branching)
+  - Context versioning with rollback capabilities
+  - Sophisticated sharing policies and permissions (Private, Shared, Public scopes)
+  - Real-time context analytics and monitoring
+  - CRDT-like conflict resolution for distributed agent coordination
+- Enhanced `MeshContext` class with backward-compatible advanced features
+- Comprehensive examples demonstrating context management patterns
+- Complete test coverage for context management functionality
+
+### Enhanced
+- Context system now supports production-grade persistence and scaling
+- Improved agent coordination through advanced memory management
+- Better isolation and security for multi-tenant agent environments
+
 ## [0.1.0] - 2025-01-08
 
 ### Added
