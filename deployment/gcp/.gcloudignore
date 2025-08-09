@@ -1,0 +1,88 @@
+# .gcloudignore - Files to ignore when building with Cloud Build
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+venv.bak/
+env.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+.dockerignore
+docker-compose*.yml
+
+# Terraform
+deployment/gcp/terraform/.terraform/
+deployment/gcp/terraform/terraform.tfstate*
+deployment/gcp/terraform/terraform.tfvars
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Local data
+meshai.db
+meshai.db-*
+data/
+
+# Documentation
+docs/_build/
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.production

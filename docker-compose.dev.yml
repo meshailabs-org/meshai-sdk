@@ -1,0 +1,52 @@
+# MeshAI SDK Development Docker Compose
+# Uses SQLite for simpler development setup
+
+version: '3.8'
+
+services:
+  # Redis for Context Management
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MeshAI Services (Development Mode)
+  meshai-dev:
+    build: .
+    environment:
+      # SQLite Configuration (simpler for dev)
+      MESHAI_SQLITE_PATH: /app/data/meshai_dev.db
+      
+      # Redis Configuration
+      MESHAI_REDIS_URL: redis://redis:6379/0
+      
+      # Service Configuration
+      MESHAI_REGISTRY_URL: http://localhost:8001
+      MESHAI_RUNTIME_URL: http://localhost:8002
+      
+      # Development Settings
+      MESHAI_DEBUG: "true"
+      MESHAI_LOG_LEVEL: DEBUG
+      MESHAI_ENABLE_METRICS: "true"
+      MESHAI_AUTO_REGISTER: "true"
+    ports:
+      - "8001:8001"  # Registry Service
+      - "8002:8002"  # Runtime Service
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./examples:/app/examples
+      - ./data:/app/data  # Persistent SQLite storage
+    restart: unless-stopped
+
+volumes:
+  data:

@@ -1,0 +1,21 @@
+# Terraform variables for MeshAI SDK deployment
+# Copy this file to terraform.tfvars and update with your values
+
+# GCP Project ID - replace with your actual project ID
+project_id = "your-gcp-project-id"
+
+# GCP Region - us-central1 is lowest cost
+region = "us-central1"
+
+# Environment name
+environment = "dev"
+
+# Optional: Additional configuration
+# These are set to optimal values for minimal cost development environment
+# Uncomment and modify if needed
+
+# postgres_tier = "db-f1-micro"
+# postgres_disk_size = 10
+# redis_memory_gb = 1
+# cloud_run_memory = "512Mi"
+# cloud_run_cpu = 1

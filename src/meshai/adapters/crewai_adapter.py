@@ -142,6 +142,7 @@ class CrewAIMeshAgent(MeshAgent):
                     
         except Exception as e:
             logger.warning(f"Failed to setup MeshAI integration: {e}")
+            # Continue without MeshAI integration if setup fails
     
     async def handle_task(self, task_data: TaskData, context: MeshContext) -> Dict[str, Any]:
         """
@@ -272,24 +273,53 @@ class CrewAIMeshAgent(MeshAgent):
             conversation_history = await context.get("conversation_history", [])
             shared_data = await context.get("shared_data", {})
             
-            # For crews, we can set context on the manager or all agents
+            # Create context summary for CrewAI
+            context_summary = self._prepare_context_summary(conversation_history, shared_data)
+            
+            # For crews, we can set context on all agents
             if self.component_type == "crew":
                 for agent in self.crewai_component.agents:
-                    if hasattr(agent, 'memory') and agent.memory:
-                        # Add context to agent memory if supported
-                        for msg in conversation_history[-5:]:  # Last 5 messages
-                            if isinstance(msg, dict) and 'content' in msg:
-                                # This is a simplified approach - real implementation
-                                # would depend on CrewAI memory structure
-                                pass
+                    self._inject_context_to_agent(agent, context_summary)
             else:
                 # Single agent context update
-                if hasattr(self.crewai_component, 'memory') and self.crewai_component.memory:
-                    # Update agent memory with context
-                    pass
+                self._inject_context_to_agent(self.crewai_component, context_summary)
                     
         except Exception as e:
             logger.warning(f"Failed to update CrewAI context: {e}")
+    
+    def _prepare_context_summary(self, conversation_history: List[Dict], shared_data: Dict) -> str:
+        """Prepare context summary for CrewAI agents"""
+        context_parts = []
+        
+        # Add relevant conversation history
+        if conversation_history:
+            recent_messages = conversation_history[-3:]  # Last 3 messages
+            context_parts.append("Recent conversation:")
+            for msg in recent_messages:
+                if isinstance(msg, dict) and 'content' in msg:
+                    role = msg.get('type', 'unknown')
+                    content = msg['content'][:200]  # Limit length
+                    context_parts.append(f"- {role}: {content}")
+        
+        # Add shared data insights
+        if shared_data:
+            context_parts.append("\nShared context:")
+            for key, value in list(shared_data.items())[:3]:  # Limit to 3 items
+                context_parts.append(f"- {key}: {str(value)[:100]}")
+        
+        return "\n".join(context_parts) if context_parts else "No additional context."
+    
+    def _inject_context_to_agent(self, agent, context_summary: str) -> None:
+        """Inject context into CrewAI agent"""
+        try:
+            # Try to update backstory with context
+            if hasattr(agent, 'backstory'):
+                original_backstory = getattr(agent, 'backstory', '')
+                if context_summary and "No additional context" not in context_summary:
+                    updated_backstory = f"{original_backstory}\n\nCurrent Context:\n{context_summary}"
+                    agent.backstory = updated_backstory[:2000]  # Limit total length
+        except Exception as e:
+            logger.debug(f"Could not inject context to agent: {e}")
     
     async def _update_context_from_crew(self, context: MeshContext, result: Dict[str, Any]) -> None:
         """Update MeshAI context from CrewAI execution results"""

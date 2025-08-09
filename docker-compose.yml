@@ -1,0 +1,88 @@
+# MeshAI SDK Docker Compose Configuration
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: meshai
+      POSTGRES_USER: meshai
+      POSTGRES_PASSWORD: meshai_dev_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meshai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Context Management
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MeshAI Services
+  meshai:
+    build: .
+    environment:
+      # Database Configuration
+      MESHAI_POSTGRES_HOST: postgres
+      MESHAI_POSTGRES_USER: meshai
+      MESHAI_POSTGRES_PASSWORD: meshai_dev_password
+      MESHAI_POSTGRES_DATABASE: meshai
+      MESHAI_POSTGRES_PORT: 5432
+      
+      # Redis Configuration
+      MESHAI_REDIS_URL: redis://redis:6379/0
+      
+      # Service Configuration
+      MESHAI_REGISTRY_URL: http://localhost:8001
+      MESHAI_RUNTIME_URL: http://localhost:8002
+      
+      # Development Settings
+      MESHAI_DEBUG: "true"
+      MESHAI_LOG_LEVEL: INFO
+      MESHAI_ENABLE_METRICS: "true"
+    ports:
+      - "8001:8001"  # Registry Service
+      - "8002:8002"  # Runtime Service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      # Mount code for development (comment out for production)
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+    restart: unless-stopped
+
+  # Optional: Prometheus for Metrics
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    depends_on:
+      - meshai
+
+volumes:
+  postgres_data:
+  redis_data:

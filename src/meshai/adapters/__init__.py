@@ -54,9 +54,10 @@ except ImportError:
 
 # Amazon/AWS adapter
 try:
-    from .amazon_adapter import BedrockMeshAgent
+    from .amazon_adapter import BedrockMeshAgent, SageMakerMeshAgent
     _available_adapters["amazon"] = {
         "BedrockMeshAgent": BedrockMeshAgent,
+        "SageMakerMeshAgent": SageMakerMeshAgent,
     }
 except ImportError:
     pass

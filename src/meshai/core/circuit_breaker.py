@@ -21,6 +21,21 @@ from prometheus_client import Counter, Histogram, Gauge
 logger = structlog.get_logger(__name__)
 
 
+class DummyMetric:
+    """Dummy metric class that accepts calls but does nothing"""
+    def labels(self, **kwargs):
+        return self
+    
+    def inc(self, amount=1):
+        pass
+    
+    def observe(self, value):
+        pass
+    
+    def set(self, value):
+        pass
+
+
 class CircuitState(str, Enum):
     """Circuit breaker states"""
     CLOSED = "closed"        # Normal operation
@@ -83,6 +98,10 @@ class CircuitBreaker:
     - Success rates in recovery
     """
     
+    # Class-level metrics to avoid duplication
+    _metrics_initialized = False
+    _shared_metrics = {}
+    
     def __init__(
         self,
         name: str,
@@ -98,37 +117,58 @@ class CircuitBreaker:
         self._lock = threading.RLock()
         self.metrics = CircuitBreakerMetrics(state=self._state)
         
-        # Prometheus metrics
-        self._setup_prometheus_metrics()
+        # Initialize shared metrics only once
+        if not CircuitBreaker._metrics_initialized:
+            self._init_shared_metrics()
+            CircuitBreaker._metrics_initialized = True
+        
+        # Reference shared metrics
+        self.call_counter = CircuitBreaker._shared_metrics["call_counter"]
+        self.call_duration = CircuitBreaker._shared_metrics["call_duration"]
+        self.state_gauge = CircuitBreaker._shared_metrics["state_gauge"]
+        self.failure_rate_gauge = CircuitBreaker._shared_metrics["failure_rate_gauge"]
         
         logger.info(f"Circuit breaker '{name}' initialized", 
                    config=self.config.__dict__)
     
-    def _setup_prometheus_metrics(self):
-        """Setup Prometheus metrics for monitoring"""
-        self.call_counter = Counter(
-            'circuit_breaker_calls_total',
-            'Total number of calls through circuit breaker',
-            ['circuit_name', 'result']
-        )
-        
-        self.call_duration = Histogram(
-            'circuit_breaker_call_duration_seconds',
-            'Duration of calls through circuit breaker',
-            ['circuit_name']
-        )
-        
-        self.state_gauge = Gauge(
-            'circuit_breaker_state',
-            'Current state of circuit breaker (0=closed, 1=open, 2=half_open)',
-            ['circuit_name']
-        )
-        
-        self.failure_rate_gauge = Gauge(
-            'circuit_breaker_failure_rate',
-            'Current failure rate of circuit breaker',
-            ['circuit_name']
-        )
+    @classmethod
+    def _init_shared_metrics(cls):
+        """Initialize shared Prometheus metrics once"""
+        try:
+            cls._shared_metrics = {
+                "call_counter": Counter(
+                    'circuit_breaker_calls_total',
+                    'Total number of calls through circuit breaker',
+                    ['circuit_name', 'result']
+                ),
+                "call_duration": Histogram(
+                    'circuit_breaker_call_duration_seconds',
+                    'Duration of calls through circuit breaker',
+                    ['circuit_name']
+                ),
+                "state_gauge": Gauge(
+                    'circuit_breaker_state',
+                    'Current state of circuit breaker (0=closed, 1=open, 2=half_open)',
+                    ['circuit_name']
+                ),
+                "failure_rate_gauge": Gauge(
+                    'circuit_breaker_failure_rate',
+                    'Current failure rate of circuit breaker',
+                    ['circuit_name']
+                )
+            }
+        except ValueError as e:
+            if "Duplicated timeseries" in str(e):
+                # Create dummy metrics that don't interfere
+                cls._shared_metrics = {
+                    "call_counter": DummyMetric(),
+                    "call_duration": DummyMetric(),
+                    "state_gauge": DummyMetric(),
+                    "failure_rate_gauge": DummyMetric()
+                }
+                logger.warning("Using dummy metrics for circuit breaker due to duplication conflict")
+            else:
+                raise
     
     @property
     def state(self) -> CircuitState:

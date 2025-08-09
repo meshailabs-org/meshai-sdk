@@ -113,18 +113,26 @@ class OpenAIMeshAgent(MeshAgent):
                 kwargs["max_tokens"] = self.max_tokens
             
             if functions:
-                kwargs["functions"] = functions
-                kwargs["function_call"] = "auto"
+                kwargs["tools"] = functions
+                kwargs["tool_choice"] = "auto"
             
             # Add custom parameters
             for key, value in task_data.parameters.items():
                 if key in ['top_p', 'frequency_penalty', 'presence_penalty', 'stop']:
                     kwargs[key] = value
             
+            # Track request for analytics
+            start_time = datetime.utcnow()
+            
             response = await self.client.chat.completions.create(**kwargs)
+            
+            # Track performance metrics
+            response_time = (datetime.utcnow() - start_time).total_seconds()
+            self._update_metrics(response, response_time)
             
             # Process response
             result = await self._process_response(response, context)
+            result["response_time_seconds"] = response_time
             
             # Update context
             await self._update_context(context, user_message, result)
@@ -153,33 +161,36 @@ class OpenAIMeshAgent(MeshAgent):
     
     def _prepare_functions(self) -> Optional[List[Dict[str, Any]]]:
         """Prepare function definitions for OpenAI API"""
-        # Add MeshAI invoke function
-        functions = [{
-            "name": "invoke_meshai_agent",
-            "description": "Invoke another MeshAI agent with specific capabilities",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "capabilities": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Required capabilities for the task"
+        # Use new OpenAI tools format instead of deprecated functions
+        tools = [{
+            "type": "function",
+            "function": {
+                "name": "invoke_meshai_agent",
+                "description": "Invoke another MeshAI agent with specific capabilities to help complete complex tasks",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "capabilities": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Required capabilities for the task (e.g., 'coding', 'analysis', 'math')"
+                        },
+                        "task": {
+                            "type": "string",
+                            "description": "Clear task description or query for the agent"
+                        },
+                        "context": {
+                            "type": "object",
+                            "description": "Additional context or parameters for the task",
+                            "additionalProperties": True
+                        }
                     },
-                    "task": {
-                        "type": "string",
-                        "description": "Task description or query"
-                    },
-                    "context": {
-                        "type": "object",
-                        "description": "Additional context for the task",
-                        "additionalProperties": True
-                    }
-                },
-                "required": ["capabilities", "task"]
+                    "required": ["capabilities", "task"]
+                }
             }
         }]
         
-        return functions
+        return tools
     
     async def _process_response(self, response: Any, context: MeshContext) -> Dict[str, Any]:
         """Process OpenAI API response"""
@@ -196,44 +207,70 @@ class OpenAIMeshAgent(MeshAgent):
             }
         }
         
-        # Handle function calls
-        if hasattr(message, 'function_call') and message.function_call:
-            function_result = await self._handle_function_call(message.function_call, context)
-            result["result"] = function_result
-            result["function_used"] = True
+        # Handle tool calls (new OpenAI format)
+        if hasattr(message, 'tool_calls') and message.tool_calls:
+            tool_results = []
+            for tool_call in message.tool_calls:
+                tool_result = await self._handle_tool_call(tool_call, context)
+                tool_results.append(tool_result)
+            result["result"] = "\n".join(tool_results) if tool_results else message.content or ""
+            result["tools_used"] = True
+            result["tool_count"] = len(message.tool_calls)
         else:
             result["result"] = message.content or ""
-            result["function_used"] = False
+            result["tools_used"] = False
         
         return result
     
-    async def _handle_function_call(self, function_call: Any, context: MeshContext) -> str:
-        """Handle function calls from OpenAI"""
+    async def _handle_tool_call(self, tool_call: Any, context: MeshContext) -> str:
+        """Handle tool calls from OpenAI (new format)"""
         try:
-            if function_call.name == "invoke_meshai_agent":
+            if tool_call.function.name == "invoke_meshai_agent":
                 import json
-                arguments = json.loads(function_call.arguments)
+                arguments = json.loads(tool_call.function.arguments)
                 
                 capabilities = arguments.get("capabilities", [])
                 task = arguments.get("task", "")
                 task_context = arguments.get("context", {})
                 
+                logger.info(f"OpenAI agent invoking MeshAI agent with capabilities: {capabilities}")
+                
                 # Invoke agent through MeshAI
                 result = await self.invoke_agent(
                     capabilities=capabilities,
-                    task={"input": task, "context": task_context},
+                    task={"input": task, "parameters": task_context},
                     routing_strategy="capability_match"
                 )
                 
                 if result.status == "completed":
-                    return str(result.result)
+                    response = str(result.result)
+                    logger.info(f"MeshAI agent invocation successful: {response[:100]}...")
+                    return response
                 else:
-                    return f"Task failed: {result.error or 'Unknown error'}"
+                    error_msg = f"Task failed: {result.error or 'Unknown error'}"
+                    logger.warning(f"MeshAI agent invocation failed: {error_msg}")
+                    return error_msg
             else:
-                return f"Unknown function: {function_call.name}"
+                return f"Unknown tool: {tool_call.function.name}"
                 
+        except json.JSONDecodeError as e:
+            return f"Invalid tool arguments: {e}"
         except Exception as e:
-            return f"Function call error: {e}"
+            logger.error(f"Tool call error: {e}")
+            return f"Tool execution error: {e}"
+    
+    def _update_metrics(self, response: Any, response_time: float) -> None:
+        """Update internal metrics tracking"""
+        if not hasattr(self, '_request_count'):
+            self._request_count = 0
+            self._token_count = 0
+            self._total_response_time = 0.0
+        
+        self._request_count += 1
+        if hasattr(response, 'usage'):
+            self._token_count += response.usage.total_tokens
+        self._total_response_time += response_time
+        self._avg_response_time = self._total_response_time / self._request_count
     
     async def _update_context(self, context: MeshContext, user_message: str, result: Dict[str, Any]):
         """Update context with conversation"""
@@ -284,5 +321,28 @@ class OpenAIMeshAgent(MeshAgent):
             "provider": "openai",
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
-            "system_prompt_length": len(self.system_prompt)
+            "system_prompt_length": len(self.system_prompt),
+            "supports_tools": True,
+            "supports_streaming": True,
+            "model_family": self._get_model_family()
+        }
+    
+    def _get_model_family(self) -> str:
+        """Get the model family for better capability understanding"""
+        if "gpt-4" in self.model.lower():
+            return "gpt-4"
+        elif "gpt-3.5" in self.model.lower():
+            return "gpt-3.5"
+        elif "davinci" in self.model.lower():
+            return "davinci"
+        else:
+            return "unknown"
+    
+    async def get_usage_stats(self) -> Dict[str, Any]:
+        """Get usage statistics for this agent"""
+        # This would integrate with OpenAI usage tracking
+        return {
+            "total_requests": getattr(self, '_request_count', 0),
+            "total_tokens": getattr(self, '_token_count', 0),
+            "avg_response_time": getattr(self, '_avg_response_time', 0.0)
         }

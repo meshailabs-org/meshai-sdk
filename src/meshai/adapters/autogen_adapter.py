@@ -25,7 +25,15 @@ logger = structlog.get_logger(__name__)
 
 
 class AutoGenMeshAgent(MeshAgent):
-    """MeshAI adapter for AutoGen agents and group chats"""
+    """MeshAI adapter for AutoGen agents and group chats
+    
+    Supports:
+    - Individual ConversableAgent wrapping
+    - GroupChatManager integration
+    - Multi-agent conversations
+    - Context preservation across interactions
+    - Dynamic capability detection
+    """
     
     def __init__(
         self,
@@ -92,58 +100,136 @@ class AutoGenMeshAgent(MeshAgent):
     async def _execute_agent(self, message: str, conversation_history: List) -> Dict[str, Any]:
         """Execute single AutoGen agent"""
         try:
-            # Create a simple user proxy for the conversation
+            # Create a user proxy with better configuration
             user_proxy = UserProxyAgent(
-                "user_proxy",
+                "meshai_user_proxy",
                 human_input_mode="NEVER",
-                max_consecutive_auto_reply=1,
-                is_termination_msg=lambda x: True
+                max_consecutive_auto_reply=3,  # Allow a few exchanges
+                is_termination_msg=lambda x: x.get("content", "").strip().endswith("TERMINATE") or len(x.get("content", "")) > 1000,
+                code_execution_config=False,  # Disable code execution for safety
+                system_message="You are a proxy for the MeshAI system."
             )
             
-            # Start conversation
-            # Note: AutoGen is typically synchronous, so this is a simplified async wrapper
+            # Add context to the message if available
+            enhanced_message = self._enhance_message_with_context(message, conversation_history)
+            
+            # Start conversation in executor
             import asyncio
             
             def run_conversation():
-                user_proxy.initiate_chat(self.autogen_component, message=message)
-                # Get the last message from the agent
-                chat_messages = user_proxy.chat_messages.get(self.autogen_component, [])
-                if chat_messages:
-                    return chat_messages[-1].get("content", "No response")
-                return "No response generated"
+                try:
+                    # Clear any existing chat messages to avoid conflicts
+                    user_proxy.reset()
+                    
+                    chat_result = user_proxy.initiate_chat(
+                        self.autogen_component, 
+                        message=enhanced_message,
+                        max_turns=3
+                    )
+                    
+                    # Extract the final response
+                    if hasattr(chat_result, 'chat_history') and chat_result.chat_history:
+                        # Get the last message from the agent (not user proxy)
+                        for msg in reversed(chat_result.chat_history):
+                            if msg.get('name') == self.autogen_component.name:
+                                return msg.get('content', 'No response')
+                    
+                    # Fallback: get from chat_messages
+                    chat_messages = user_proxy.chat_messages.get(self.autogen_component, [])
+                    if chat_messages:
+                        return chat_messages[-1].get("content", "No response")
+                    
+                    return "No response generated"
+                    
+                except Exception as e:
+                    logger.error(f"AutoGen conversation error: {e}")
+                    return f"Conversation error: {str(e)[:200]}"
             
             response = await asyncio.get_event_loop().run_in_executor(None, run_conversation)
             
             return {
                 "result": response,
                 "type": "autogen_agent_response",
-                "agent_name": getattr(self.autogen_component, 'name', 'unknown')
+                "agent_name": getattr(self.autogen_component, 'name', 'unknown'),
+                "agent_role": getattr(self.autogen_component, 'system_message', '')[:100],
+                "execution_mode": "single_agent"
             }
             
         except Exception as e:
+            logger.error(f"AutoGen agent execution failed: {e}")
             raise TaskExecutionError(f"AutoGen agent execution failed: {e}")
     
     async def _execute_group_chat_manager(self, message: str, conversation_history: List) -> Dict[str, Any]:
         """Execute AutoGen group chat"""
         try:
-            # This is a simplified implementation
-            # Real implementation would involve more complex group chat management
-            
             import asyncio
             
             def run_group_chat():
-                # Simplified group chat execution
-                return f"Group chat processed: {message}"
+                try:
+                    # Get the group chat from the manager
+                    if hasattr(self.autogen_component, 'groupchat'):
+                        groupchat = self.autogen_component.groupchat
+                        agents = getattr(groupchat, 'agents', [])
+                    else:
+                        agents = getattr(self.autogen_component, 'agents', [])
+                    
+                    if not agents:
+                        return "No agents available in group chat"
+                    
+                    # Create a user proxy for the group chat
+                    user_proxy = UserProxyAgent(
+                        "meshai_group_proxy",
+                        human_input_mode="NEVER",
+                        max_consecutive_auto_reply=1,
+                        is_termination_msg=lambda x: True,
+                        code_execution_config=False
+                    )
+                    
+                    # Enhanced message for group context
+                    enhanced_message = self._enhance_message_with_context(message, conversation_history)
+                    
+                    # Initiate group chat
+                    chat_result = user_proxy.initiate_chat(
+                        self.autogen_component,
+                        message=enhanced_message,
+                        max_turns=5
+                    )
+                    
+                    # Extract responses from all agents
+                    responses = []
+                    if hasattr(chat_result, 'chat_history') and chat_result.chat_history:
+                        for msg in chat_result.chat_history:
+                            if msg.get('name') != 'meshai_group_proxy':
+                                agent_name = msg.get('name', 'unknown')
+                                content = msg.get('content', '')
+                                if content:
+                                    responses.append(f"{agent_name}: {content}")
+                    
+                    return "\n\n".join(responses) if responses else "No responses from group chat"
+                    
+                except Exception as e:
+                    logger.error(f"Group chat execution error: {e}")
+                    return f"Group chat execution error: {str(e)[:200]}"
             
             response = await asyncio.get_event_loop().run_in_executor(None, run_group_chat)
+            
+            # Get participant information
+            participants = []
+            if hasattr(self.autogen_component, 'groupchat'):
+                groupchat = self.autogen_component.groupchat
+                agents = getattr(groupchat, 'agents', [])
+                participants = [getattr(agent, 'name', 'unknown') for agent in agents]
             
             return {
                 "result": response,
                 "type": "autogen_group_chat_response",
-                "participants": getattr(self.autogen_component, 'agents', [])
+                "participants": participants,
+                "participant_count": len(participants),
+                "execution_mode": "group_chat"
             }
             
         except Exception as e:
+            logger.error(f"AutoGen group chat execution failed: {e}")
             raise TaskExecutionError(f"AutoGen group chat execution failed: {e}")
     
     async def _update_context(self, context: MeshContext, message: str, result: Dict[str, Any]):
@@ -174,3 +260,39 @@ class AutoGenMeshAgent(MeshAgent):
             ]
         
         return info
+    
+    def _enhance_message_with_context(self, message: str, conversation_history: List) -> str:
+        """Enhance message with relevant context"""
+        if not conversation_history:
+            return message
+        
+        # Add recent context
+        context_parts = ["Previous conversation context:"]
+        for msg in conversation_history[-2:]:  # Last 2 messages
+            if isinstance(msg, dict) and 'content' in msg:
+                role = msg.get('type', 'unknown')
+                content = msg['content'][:150]  # Limit length
+                context_parts.append(f"- {role}: {content}")
+        
+        context_summary = "\n".join(context_parts)
+        return f"{context_summary}\n\nCurrent task: {message}"
+    
+    async def get_agent_capabilities(self) -> List[str]:
+        """Get dynamic capabilities based on AutoGen component"""
+        capabilities = list(self.capabilities)  # Start with base capabilities
+        
+        # Add capabilities based on system message or role
+        if hasattr(self.autogen_component, 'system_message'):
+            system_msg = self.autogen_component.system_message.lower()
+            
+            if 'code' in system_msg or 'programming' in system_msg:
+                capabilities.append('coding')
+            if 'analysis' in system_msg or 'analyze' in system_msg:
+                capabilities.append('analysis')
+            if 'math' in system_msg or 'calculation' in system_msg:
+                capabilities.append('mathematics')
+            if 'research' in system_msg:
+                capabilities.append('research')
+        
+        # Remove duplicates
+        return list(set(capabilities))
