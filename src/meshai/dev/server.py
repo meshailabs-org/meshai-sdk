@@ -307,24 +307,38 @@ class DevServer:
         
         logger.info("🔍 Discovering agents...")
         
-        # Look for agents in common locations
+        # Look for agents in common locations, avoiding SDK source directories
         search_paths = [
             Path("agents"),
-            Path("src/agents"),
+            Path("src/agents"), 
             Path("app/agents"),
-            Path(".")
         ]
+        
+        # Only include current directory if it doesn't look like an SDK source
+        current_path = Path(".")
+        if not (current_path / "src" / "meshai").exists():
+            search_paths.append(current_path)
         
         for search_path in search_paths:
             if not search_path.exists():
                 continue
-                
+            
+            logger.debug(f"Searching for agents in: {search_path}")
+            
             for py_file in search_path.rglob("*.py"):
-                if py_file.name.startswith("_"):
+                # Skip private files and common SDK structure patterns
+                if (py_file.name.startswith("_") or 
+                    py_file.name in ["setup.py", "test_dev_server.py"] or
+                    "adapters" in py_file.parts or
+                    "cli" in py_file.parts or
+                    "utils" in py_file.parts or
+                    "core" in py_file.parts):
                     continue
                     
                 try:
                     await self._load_agent_from_file(py_file)
+                except ImportError as e:
+                    logger.debug(f"Skipping {py_file}: missing dependency - {e}")
                 except Exception as e:
                     logger.warning(f"Could not load agent from {py_file}: {e}")
     
@@ -337,7 +351,13 @@ class DevServer:
                 f"agent_{file_path.stem}", 
                 file_path
             )
+            if spec is None or spec.loader is None:
+                logger.debug(f"Cannot create spec for {file_path}")
+                return
+                
             module = importlib.util.module_from_spec(spec)
+            
+            # Execute module in a try/catch to handle import errors
             spec.loader.exec_module(module)
             
             # Look for agent classes
