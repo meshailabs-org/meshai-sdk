@@ -36,9 +36,21 @@ class MeshRegistry:
     and capability indexing.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config = None):
         """Initialize the registry"""
-        self.config = config or {}
+        # Handle both dict config and MeshConfig objects
+        if config is None:
+            self.config = {}
+        elif hasattr(config, 'to_dict'):
+            # MeshConfig object
+            self.config = config.to_dict()
+        elif hasattr(config, 'get'):
+            # Dict-like object
+            self.config = config
+        else:
+            # Fallback to dict
+            self.config = dict(config) if config else {}
+            
         self.agents: Dict[str, RegistryEntry] = {}
         self._lock = asyncio.Lock()
         self._running = False
@@ -216,6 +228,15 @@ class MeshRegistry:
             List of healthy agents
         """
         return await self.list_agents(status=AgentStatus.HEALTHY)
+        
+    async def get_all_agents(self) -> List[RegistryEntry]:
+        """
+        Get all agents regardless of status.
+        
+        Returns:
+            List of all registered agents
+        """
+        return await self.list_agents()
         
     async def _health_check_loop(self):
         """Background task to check agent health"""

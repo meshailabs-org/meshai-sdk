@@ -116,6 +116,10 @@ class MeshConfig:
             return f"http://localhost:{self.agent_port}"
         return f"http://{self.agent_host}:{self.agent_port}"
     
+    def get(self, key: str, default=None):
+        """Get configuration value by key with optional default"""
+        return getattr(self, key, default)
+    
     def get_headers(self) -> Dict[str, str]:
         """Get HTTP headers for API requests"""
         headers = {
