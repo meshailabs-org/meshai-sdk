@@ -326,13 +326,8 @@ class DevServer:
             logger.debug(f"Searching for agents in: {search_path}")
             
             for py_file in search_path.rglob("*.py"):
-                # Skip private files and common SDK structure patterns
-                if (py_file.name.startswith("_") or 
-                    py_file.name in ["setup.py", "test_dev_server.py"] or
-                    "adapters" in py_file.parts or
-                    "cli" in py_file.parts or
-                    "utils" in py_file.parts or
-                    "core" in py_file.parts):
+                # Skip files in virtual environments and package directories
+                if self._should_skip_file(py_file):
                     continue
                     
                 try:
@@ -340,7 +335,67 @@ class DevServer:
                 except ImportError as e:
                     logger.debug(f"Skipping {py_file}: missing dependency - {e}")
                 except Exception as e:
-                    logger.warning(f"Could not load agent from {py_file}: {e}")
+                    logger.warning(f"Error loading file {py_file}: {e}")
+    
+    def _should_skip_file(self, file_path: Path) -> bool:
+        """Check if a file should be skipped during agent discovery"""
+        
+        # Convert to string for easier path matching
+        path_str = str(file_path)
+        path_parts = file_path.parts
+        
+        # Skip private files
+        if file_path.name.startswith("_"):
+            return True
+        
+        # Skip common non-agent files
+        skip_files = {
+            "setup.py", "test_dev_server.py", "conftest.py", 
+            "__init__.py", "__main__.py"
+        }
+        if file_path.name in skip_files:
+            return True
+        
+        # Skip virtual environment directories (common patterns)
+        venv_patterns = {
+            "venv", "env", ".venv", ".env", "virtualenv", 
+            "meshai-env", "python-env", ".virtualenv"
+        }
+        for part in path_parts:
+            if part in venv_patterns:
+                return True
+        
+        # Skip site-packages and other Python installation directories
+        install_patterns = {
+            "site-packages", "dist-packages", ".eggs", "build", 
+            "lib64", "__pycache__", ".pytest_cache"
+        }
+        for part in path_parts:
+            if part in install_patterns:
+                return True
+        
+        # Skip test directories and files
+        test_patterns = {"test", "tests", "testing"}
+        for part in path_parts:
+            if part in test_patterns:
+                return True
+        
+        # Skip if file contains "test" in name  
+        if "test" in file_path.name.lower():
+            return True
+        
+        # Skip common SDK structure patterns
+        sdk_patterns = {"adapters", "cli", "utils", "core", "dev"}
+        for part in path_parts:
+            if part in sdk_patterns:
+                return True
+        
+        # Skip hidden directories (starting with .)
+        for part in path_parts:
+            if part.startswith(".") and len(part) > 1:
+                return True
+        
+        return False
     
     async def _load_agent_from_file(self, file_path: Path):
         """Load an agent from a Python file"""
