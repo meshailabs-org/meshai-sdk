@@ -32,6 +32,17 @@ asyncio-mqtt>=0.13.0  # Optional MQTT support
 packaging>=21.3  # For version parsing
 typing-extensions>=4.5.0  # For enhanced typing support
 
+# CLI Dependencies
+click>=8.0.0  # Command line interface
+rich>=13.0.0  # Rich terminal output
+pyyaml>=6.0.0  # YAML configuration
+
+# Development Server Dependencies
+fastapi>=0.104.0  # Web framework for dev server
+uvicorn[standard]>=0.24.0  # ASGI server
+websockets>=11.0.0  # WebSocket support
+watchdog>=3.0.0  # File watching (optional)
+
 # AI Framework Dependencies (optional)
 # Uncomment based on your needs:
 

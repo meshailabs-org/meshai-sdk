@@ -45,6 +45,13 @@ setup(
         "websockets>=11.0.0",
         "prometheus-client>=0.17.0",
         "structlog>=23.0.0",
+        # CLI dependencies
+        "click>=8.0.0",
+        "rich>=13.0.0",
+        "pyyaml>=6.0.0",
+        # Development server dependencies
+        "fastapi>=0.104.0",
+        "uvicorn[standard]>=0.24.0",
     ],
     extras_require={
         "langchain": [
@@ -80,6 +87,7 @@ setup(
             "isort>=5.12.0",
             "flake8>=6.0.0",
             "mypy>=1.0.0",
+            "watchdog>=3.0.0",  # File watching for dev server
         ],
         "all": [
             "langchain>=0.1.0",
@@ -97,7 +105,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "meshai=meshai.cli:main",
+            "meshai=meshai.cli.main:main",
         ],
     },
 )
