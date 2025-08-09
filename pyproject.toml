@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -34,6 +34,13 @@ dependencies = [
     "websockets>=11.0.0",
     "prometheus-client>=0.17.0",
     "structlog>=23.0.0",
+    # CLI dependencies
+    "click>=8.0.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0.0",
+    # Development server dependencies
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
 ]
 
 [project.optional-dependencies]
@@ -62,6 +69,7 @@ dev = [
     "isort>=5.12.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "watchdog>=3.0.0",  # File watching for dev server
 ]
 all = [
     "langchain>=0.1.0",
@@ -78,7 +86,7 @@ all = [
 ]
 
 [project.scripts]
-meshai = "meshai.cli:main"
+meshai = "meshai.cli.main:main"
 
 [project.urls]
 Homepage = "https://meshai.dev"
