@@ -90,7 +90,9 @@ class HotReloader:
     def _initialize_module_tracking(self):
         """Initialize tracking for already loaded modules"""
         
-        for name, module in sys.modules.items():
+        # Create a snapshot to avoid dictionary change during iteration
+        modules_snapshot = dict(sys.modules)
+        for name, module in modules_snapshot.items():
             if self._should_track_module(name, module):
                 self._add_module_tracking(name, module)
     
@@ -199,7 +201,9 @@ class HotReloader:
     def _cleanup_instance_ref(self, weak_ref: weakref.ref):
         """Clean up dead instance references"""
         
-        for module_name, refs in self.instance_registry.items():
+        # Create snapshot to avoid modifying dictionary during iteration
+        registry_snapshot = dict(self.instance_registry)
+        for module_name, refs in registry_snapshot.items():
             if weak_ref in refs:
                 refs.remove(weak_ref)
                 break

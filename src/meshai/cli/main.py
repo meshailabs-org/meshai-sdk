@@ -846,12 +846,27 @@ def create_dev_server_script(port: int, watch: bool, debug: bool) -> str:
 import asyncio
 import logging
 import sys
+import warnings
 from pathlib import Path
 
-# Add src directory to path for MeshAI imports
-src_path = Path(__file__).parent / "src"
+# Suppress setuptools warnings that can interfere with script execution
+warnings.filterwarnings("ignore", category=UserWarning, module="setuptools")
+
+# Add current directory and src directory to path for MeshAI imports
+current_dir = Path.cwd()
+src_path = current_dir / "src"
 if src_path.exists():
     sys.path.insert(0, str(src_path))
+else:
+    # Add current directory for development installs
+    sys.path.insert(0, str(current_dir))
+
+# Also try to use the current Python path
+import os
+if 'PYTHONPATH' in os.environ:
+    for path in os.environ['PYTHONPATH'].split(os.pathsep):
+        if path and path not in sys.path:
+            sys.path.insert(0, path)
 
 try:
     from meshai.dev.server import run_dev_server

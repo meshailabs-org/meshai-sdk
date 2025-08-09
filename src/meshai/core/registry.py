@@ -253,15 +253,18 @@ class MeshRegistry:
         timeout_threshold = timedelta(seconds=self.heartbeat_timeout)
         
         async with self._lock:
-            for agent_id, entry in self.agents.items():
-                time_since_heartbeat = current_time - entry.last_heartbeat
-                
-                if time_since_heartbeat > timeout_threshold:
-                    if entry.status != AgentStatus.UNHEALTHY:
-                        entry.status = AgentStatus.UNHEALTHY
-                        logger.warning("agent_unhealthy", 
-                                     agent_id=agent_id,
-                                     last_heartbeat=entry.last_heartbeat)
+            # Create a snapshot of agents to avoid dictionary change during iteration
+            agents_snapshot = dict(self.agents)
+            
+        for agent_id, entry in agents_snapshot.items():
+            time_since_heartbeat = current_time - entry.last_heartbeat
+            
+            if time_since_heartbeat > timeout_threshold:
+                if entry.status != AgentStatus.UNHEALTHY:
+                    entry.status = AgentStatus.UNHEALTHY
+                    logger.warning("agent_unhealthy", 
+                                 agent_id=agent_id,
+                                 last_heartbeat=entry.last_heartbeat)
                                      
     def get_registry_stats(self) -> Dict[str, Any]:
         """
