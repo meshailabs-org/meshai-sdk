@@ -19,6 +19,14 @@ class TaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class AgentStatus(str, Enum):
+    """Agent health status"""
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEGRADED = "degraded"
+    UNKNOWN = "unknown"
+
+
 class RoutingStrategy(str, Enum):
     """Task routing strategy"""
     ROUND_ROBIN = "round_robin"
@@ -70,6 +78,19 @@ class TaskResult(BaseModel):
     retry_count: int = 0
     routing_strategy_used: Optional[RoutingStrategy] = None
     context_updates: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AgentMetadata(BaseModel):
+    """Agent metadata for registry"""
+    model_config = ConfigDict(extra="allow")
+    
+    agent_id: str
+    name: str
+    framework: str
+    model: str
+    capabilities: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+    version: Optional[str] = None
 
 
 class AgentInfo(BaseModel):

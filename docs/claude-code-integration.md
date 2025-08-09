@@ -4,26 +4,36 @@ This guide shows you how to run MeshAI inside the Claude Code environment for po
 
 ## 🚀 **Running MeshAI in Claude Code**
 
-### **Step 1: Install MeshAI SDK**
+### **Step 1: Set Up Python Virtual Environment**
 ```bash
-# Install the MeshAI SDK with all dependencies
-pip install -e ./meshai-sdk
+# Create a virtual environment to avoid system Python conflicts
+python3 -m venv meshai-env
 
-# Or install development dependencies
-cd meshai-sdk
-pip install -r requirements.txt
+# Use the virtual environment's pip for installations
+meshai-env/bin/pip install --upgrade pip
 ```
 
-### **Step 2: Initialize a MeshAI Project**
+### **Step 2: Install MeshAI SDK**
+```bash
+# Install the MeshAI SDK in editable mode
+meshai-env/bin/pip install -e ./meshai-sdk
+
+# Install development dependencies
+cd meshai-sdk
+../meshai-env/bin/pip install -r requirements.txt
+cd ..
+```
+
+### **Step 3: Initialize a MeshAI Project**
 ```bash
 # Create a new MeshAI project in Claude Code
-meshai init claude-code-project --template multi-agent
+meshai-env/bin/meshai init claude-code-project --template multi-agent
 
 # Navigate to the project
 cd claude-code-project
 ```
 
-### **Step 3: Configure Environment**
+### **Step 4: Configure Environment**
 ```bash
 # Copy environment template
 cp .env.example .env
@@ -33,10 +43,10 @@ cp .env.example .env
 # OPENAI_API_KEY=your-openai-key
 ```
 
-### **Step 4: Start MeshAI Development Server**
+### **Step 5: Start MeshAI Development Server**
 ```bash
 # Start the hot-reload development server
-meshai dev server --port 8080 --watch --debug
+meshai-env/bin/meshai dev server --port 8080 --watch --debug
 ```
 
 This will give you:
@@ -45,28 +55,28 @@ This will give you:
 - **Real-time agent testing interface**
 - **Hot-reload when you modify agents**
 
-### **Step 5: Create Agents for Claude Code Tasks**
+### **Step 6: Create Agents for Claude Code Tasks**
 
 Create agents that help with code development:
 
 ```bash
 # Create a code reviewer agent
-meshai agent create code-reviewer --framework anthropic --capabilities code-analysis,debugging,optimization
+meshai-env/bin/meshai agent create code-reviewer --framework anthropic --capabilities code-analysis,debugging,optimization
 
 # Create a documentation agent  
-meshai agent create doc-writer --framework openai --capabilities documentation,commenting,explanation
+meshai-env/bin/meshai agent create doc-writer --framework openai --capabilities documentation,commenting,explanation
 
 # Create a test generator agent
-meshai agent create test-generator --framework anthropic --capabilities testing,unit-tests,integration-tests
+meshai-env/bin/meshai agent create test-generator --framework anthropic --capabilities testing,unit-tests,integration-tests
 ```
 
-### **Step 6: Test Your Setup**
+### **Step 7: Test Your Setup**
 ```bash
 # Test an agent
-meshai agent test code-reviewer --message "Review this Python function for potential bugs"
+meshai-env/bin/meshai agent test code-reviewer --message "Review this Python function for potential bugs"
 
 # List all agents
-meshai agent list --format table
+meshai-env/bin/meshai agent list --format table
 ```
 
 ## 🔧 **Example: Code Review Workflow**
@@ -124,17 +134,19 @@ class CodeReviewerAgent(AnthropicMeshAgent):
 The comprehensive CLI tool provides direct integration:
 
 ```bash
-# Install MeshAI SDK
-pip install meshai-sdk
-
+# Using the virtual environment's MeshAI CLI
 # Initialize a new project
-meshai init my-claude-project --template multi-agent
+meshai-env/bin/meshai init my-claude-project --template multi-agent
 
 # Create agents that work with Claude
-meshai agent create claude-assistant --framework anthropic --model claude-3-sonnet-20240229
+meshai-env/bin/meshai agent create claude-assistant --framework anthropic --model claude-3-sonnet-20240229
 
 # Start development server
-meshai dev server --port 8080 --watch --debug
+meshai-env/bin/meshai dev server --port 8080 --watch --debug
+
+# Or activate the virtual environment for easier access
+source meshai-env/bin/activate
+meshai --help  # Now you can use meshai directly
 ```
 
 ### **2. Direct SDK Integration**
@@ -223,7 +235,7 @@ result = await test_generator.handle_task(
 ### **Custom Agent Templates**
 ```bash
 # Create custom agent with specific capabilities
-meshai agent create my-custom-agent \
+meshai-env/bin/meshai agent create my-custom-agent \
   --framework anthropic \
   --model claude-3-opus-20240229 \
   --capabilities custom-analysis,code-generation,refactoring
@@ -263,16 +275,38 @@ MESHAI_LOG_LEVEL=INFO
 
 ## 🚨 **Troubleshooting**
 
+### **Python Environment Issues**
+```bash
+# If you encounter "externally-managed-environment" error:
+# Always use virtual environment
+python3 -m venv meshai-env
+meshai-env/bin/pip install -e ./meshai-sdk
+
+# If pip is missing in virtual environment:
+meshai-env/bin/python -m ensurepip --upgrade
+```
+
+### **Missing Registry Module**
+If you encounter `ModuleNotFoundError: No module named 'meshai.core.registry'`:
+```bash
+# The registry module needs to be created
+# Check if it exists:
+ls meshai-sdk/src/meshai/core/registry.py
+
+# If missing, the module needs to be added to the SDK
+# This should be fixed in the latest version
+```
+
 ### **Agent Not Starting**
 ```bash
 # Check agent registration
-meshai agent list
+meshai-env/bin/meshai agent list
 
 # Validate configuration
-meshai config validate --fix
+meshai-env/bin/meshai config validate --fix
 
 # Check logs
-meshai logs --service registry --level DEBUG
+meshai-env/bin/meshai logs --service registry --level DEBUG
 ```
 
 ### **Development Server Issues**
@@ -281,7 +315,7 @@ meshai logs --service registry --level DEBUG
 netstat -an | grep :8080
 
 # Restart with different port
-meshai dev server --port 3000
+meshai-env/bin/meshai dev server --port 3000
 
 # Check file permissions
 ls -la agents/
