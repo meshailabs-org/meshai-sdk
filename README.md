@@ -379,23 +379,26 @@ make lint
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (Q4 2024)
-- Core framework adapters (OpenAI, Anthropic, Google, LangChain, CrewAI, AutoGen)
+### ✅ Completed (Q3 2025)
+- Core framework adapters (OpenAI, Anthropic, Google, LangChain, CrewAI, AutoGen, Amazon)
 - Cross-agent communication and routing
-- Production deployment infrastructure
-- Comprehensive monitoring and metrics
+- Production deployment infrastructure with GCP
+- Comprehensive monitoring, metrics, and observability
+- Developer Experience Tools (CLI, hot-reload server, project scaffolding)
+- Advanced examples and documentation
+- Test automation and CI/CD integration
 
-### 🚧 In Progress (Q1 2025)
+### 🚧 In Progress (Q4 2025)
+- Advanced Features Integration
+- Security and Scalability improvements
 - Visual workflow designer
 - Enterprise SSO integration
-- Advanced security features
-- Performance optimizations
 
-### 🔮 Coming Soon (Q2 2025)
-- Agent marketplace
-- Custom framework adapters
+### 🔮 Coming Soon (Q1 2026)
+- Agent marketplace and custom adapters
 - Multi-region deployment
-- Advanced analytics
+- Advanced analytics and ML-powered routing
+- Enterprise features and governance
 
 ## 📄 License
 
